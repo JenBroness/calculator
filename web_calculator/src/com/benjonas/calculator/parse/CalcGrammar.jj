@@ -1,0 +1,193 @@
+/**
+ * JavaCC template file created by SF JavaCC plugin 1.5.28+ wizard for JavaCC 1.5.0+
+ */options{  static = false;}PARSER_BEGIN(CalcGrammar)package com.benjonas.calculator.parse;
+import java.io.InputStream;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.charset.Charset;
+
+public class CalcGrammar{  public static Expr parse(String problem) throws ParseException  {
+    CalcGrammar parser = new CalcGrammar(new ByteArrayInputStream(
+      problem.getBytes(Charset.defaultCharset())
+    ));
+    /*
+    File file = new File("C:/Users/bjonas/workspace/web calculator/src/com/benjonas/calculator/parse/calc_input");
+    s = new FileInputStream(file);
+    
+    try
+    {
+      parser = new CalcGrammar(s);
+    }
+    catch (IOException e)
+    {
+      e.printStackTrace();
+    }
+    */
+
+    //System.out.println("--");
+    Expr expr = null;    try    {
+      expr = parser.s();      //System.out.println("Problem: " + expr.toString());
+      //System.out.println("Answer: " + evalExpr(expr));    }    catch (Exception e)    {      System.out.println(e.getMessage());
+      //break;    }    catch (Error e)    {      System.out.println(e.getMessage());
+      //break;    }
+    return expr;  }
+  
+  public static abstract class Expr  {
+    BinLink l;
+    void link (BinLink l)    {      this.l = l;
+    }
+
+    String suffix()    {
+      /*ArrayList<Character> suffix = new ArrayList<Character>();
+      BinLink currLink = this.l;
+      while (currLink != null)      {
+        for (char c : l.toString().toCharArray())        {          suffix.add(c);
+        }
+        currLink = currLink.l;
+      }
+      return suffix.toString();*/
+      if (this.l == null) {        return "";
+      } else {
+        return this.l.toString();
+      }    }  }
+
+  static class StartVal extends Expr  {    float n;
+    StartVal(float n)    {
+      this.n = n;
+      this.l = null;
+    }
+
+    void link(BinLink l)    {      this.l=l;
+    }
+
+    public String toString()    {      return (new Float(n)).toString() + this.suffix();
+    }
+  }
+
+  static class BinLink extends Expr  {
+    Character op;
+    Expr e;
+    BinLink(char op, Expr e)    {      this.op = op;
+      this.e = e;
+      this.l = null;
+    }
+
+    public String toString()    {      return (op.toString() + "(" + e.toString() + ")"
+       + this.suffix());
+    }  }
+  
+  static class Neg extends Expr {
+    Expr e;
+	Neg (Expr e) {this.e = e; this.l = null;}
+	
+	public String toString()
+	{
+	  return "-(" + e.toString() + ")" + this.suffix();
+	}
+  }
+
+  public static float evalExpr(Expr baseExpr)  {
+    float acc;
+    if (baseExpr instanceof Neg)    {      acc = evalExpr(((Neg)baseExpr).e) * -1;
+    }
+    else if (baseExpr instanceof StartVal)
+    {      acc = ((StartVal)baseExpr).n;
+    }
+    else    {      throw new Error("Expression starts with binary link");
+    }
+
+    //System.out.println("Accumulator is "+acc);
+    BinLink currLink = baseExpr.l;
+    
+    while (currLink != null)    {
+      //System.out.print(currLink.op + " " + currLink.e + " = ");
+      if (currLink.op == '*')      {
+        acc *= evalExpr(currLink.e);      }
+      else if (currLink.op == '/')
+      {
+        acc /= evalExpr(currLink.e);      }
+      else if (currLink.op == '+')
+      {
+        acc += evalExpr(currLink.e);      }
+      else if (currLink.op == '-')
+      {
+        acc -= evalExpr(currLink.e);      }
+      else      {        throw new Error("Operation not one of (+,-,*,/)");
+      }
+      //System.out.print(acc + ";");
+      currLink = currLink.l; //Traverse list
+    }
+        return acc; 
+  }
+}PARSER_END(CalcGrammar)SKIP :{ " " | "\r" | "\t" | "\n" }TOKEN :{  < PLUS : "+" >| < MINUS : "-" >| < MUL : "*" >| < DIV : "/" >
+| < NUMBER: ((< DIGIT >)+ (".")?) | ((< DIGIT >)* "." (< DIGIT >)+) >
+| < #DIGIT: [ "0"-"9" ] >}/** Root production. 
+    S -> E */
+Expr s():	{Expr e;}
+			{
+			  e=e() ";" {return e;}
+			}
+
+/** E -> FE' */
+Expr e():	{Expr e; BinLink l;}
+			{
+			  e=f() l=ee()			  {
+			    Expr caboose = e;
+			    while (caboose.l != null) caboose = caboose.l;			    caboose.link(l); return e;			  }
+			}
+
+/** E' -> +FE' | -FE' | epsilon */
+BinLink ee():	{Character op = null; Expr e = null; BinLink l = null;}
+			{ 
+			  [(< PLUS > {op='+';} | < MINUS > {op='-';}) e=f() l=ee()]
+			  {
+			    if (op == null) { //epsilon case
+				  return null;
+				}
+				BinLink mainLink = new BinLink(op,e);
+			    mainLink.link(l); return mainLink;
+			  }
+			}
+
+/** F -> GF' */
+Expr f():	{Expr e; BinLink l;}
+			{ 
+			  e=g() l=ff()			  {
+			    Expr caboose = e;
+			    while (caboose.l != null) caboose = caboose.l;
+			    caboose.link(l); return e;			    e.link(l); return e;			  }			  
+			}
+			
+/** F' -> *GF' | /GF' | epsilon */
+BinLink ff():	{Character op = null; Expr e = null; BinLink l = null;}
+			{
+			  [(< MUL > {op='*';} | < DIV > {op='/';}) e=g() l=ff()]
+			  {
+			    if (op == null) { //epsilon case
+				  return null;
+				}
+				BinLink mainLink = new BinLink(op,e);
+			    mainLink.link(l); return mainLink;
+			  }
+			}
+
+/** G -> (E) | -(E) | val | -val */
+Expr g(): 	{boolean neg=false; Expr e = null; Token digits = null;}
+			{ 
+			  ("-" {neg=true;})? ( "(" e=e() ")" | digits= < NUMBER > )
+			  {
+				if (digits != null) {
+				  float n = Float.parseFloat(digits.image);
+				  if (neg) {
+				    n *= -1;
+				  }
+				  return new StartVal(n);
+				}
+				if (neg) {
+				  return new Neg(e);
+				}
+				return e;
+			  }
+			}
